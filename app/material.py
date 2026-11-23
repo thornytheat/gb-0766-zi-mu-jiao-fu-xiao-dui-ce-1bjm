@@ -3,7 +3,7 @@ from .settings import SAMPLE_ROOT
 
 
 def example(name):
-    if name not in ('dirty', 'clean'):
+    if name not in ('dirty', 'clean', 'bilingual'):
         raise Rejection('NO_SAMPLE', '找不到交付样例', 404)
     root = SAMPLE_ROOT / name
     return {field: (root / f'{field}.csv').read_bytes().decode() for field in ('cues', 'cuts')}

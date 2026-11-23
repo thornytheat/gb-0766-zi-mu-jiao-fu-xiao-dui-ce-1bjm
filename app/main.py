@@ -1,9 +1,12 @@
 import os
+from pathlib import Path
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 from .modules.delivery.routes import delivery
 from .modules.runs.files import CutArchive
 from .modules.runs.routes import runs
+from .modules.switching.files import SwitchArchive
+from .modules.switching.routes import switching
 from .problems import Rejection
 from .web import sheets
 
@@ -12,8 +15,14 @@ def create_app(root=None):
     app = Flask(__name__)
     app.url_map.redirect_defaults = False
     app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
-    app.extensions['cut_archive'] = CutArchive(root or os.getenv('CAPTION_ARCHIVE', 'var/cuts'))
-    for module in (sheets, runs, delivery):
+    if root:
+        cut_root, switch_root = Path(root), Path(root) / 'switches'
+    else:
+        cut_root = Path(os.getenv('CAPTION_ARCHIVE', 'var/cuts'))
+        switch_root = Path(os.getenv('SWITCH_ARCHIVE', 'var/switches'))
+    app.extensions['cut_archive'] = CutArchive(cut_root)
+    app.extensions['switch_archive'] = SwitchArchive(switch_root)
+    for module in (sheets, runs, delivery, switching):
         app.register_blueprint(module)
 
     @app.get('/health')

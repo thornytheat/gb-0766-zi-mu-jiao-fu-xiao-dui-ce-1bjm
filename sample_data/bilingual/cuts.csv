@@ -1,0 +1,4 @@
+cut,start,end,target,kind
+A-01,0,500,0,KEEP
+A-02,500,700,,REMOVE
+B-01,700,1200,401,KEEP

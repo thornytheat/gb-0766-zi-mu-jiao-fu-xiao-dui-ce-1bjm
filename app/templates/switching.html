@@ -1,0 +1,45 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>双语切轨 · 字幕交付校对册</title>
+{% for name in ['theme','layout','grid'] %}<link rel="stylesheet" href="{{ url_for('static', filename=name ~ '.css') }}">{% endfor %}
+<link rel="stylesheet" href="{{ url_for('static', filename='switching.css') }}">
+<script type="module" src="{{ url_for('static', filename='switching.js') }}"></script></head><body data-sheet="switching">
+<div class="binder"><nav aria-label="字幕校对页"><a href="/" class="brand"><span aria-hidden="true">▤</span> 场记簿</a><div class="tab-list">{% for tab,label in tabs.items() %}<a {% if sheet == tab %}aria-current="page"{% endif %} href="{{ url_for('sheets.grid',sheet=tab,sample=sample) }}">{{ label }}</a>{% endfor %}</div><small>30000/1001 → 24 fps</small></nav>
+<div class="workspace"><header><div><div class="slug">POST / TRACK SWITCH</div><h1>双语试映切轨对账</h1></div><form id="sample-form"><label for="reel">交付原件</label><select id="reel"><option value="bilingual" {{ 'selected' if sample == 'bilingual' }}>双语试映 · 切轨样例</option><option value="dirty" {{ 'selected' if sample == 'dirty' }}>公映剪辑 · 脏样例</option><option value="clean" {{ 'selected' if sample == 'clean' }}>交付底稿 · 净样例</option></select><button id="publish">归档切轨</button></form></header>
+<main>
+<section class="panel register" aria-label="切轨结论"><div class="kpis">
+{% for field, label in [('requested_frame','请求帧'),('actual_frame','实际切轨帧')] %}
+<div><b id="kpi-{{ field }}">{{ result.decision[field] }}</b><span>{{ label }} <small>24 fps</small></span></div>{% endfor %}
+<div><b id="kpi-rule">{{ result.decision.rule }}</b><span>取舍规则</span></div>
+<div><b id="kpi-missed">{{ result.counts.missed }}</b><span>漏播 <small>目标帧</small></span></div>
+<div><b id="kpi-abandoned">{{ result.counts.abandoned }}</b><span>弃用 <small>目标帧</small></span></div>
+<div><b id="kpi-replayed">{{ result.counts.replayed }}</b><span>重播 <small>目标帧</small></span></div>
+</div><div class="formula"><span class="square">ƒx</span><span id="focused-cell" role="status">归档号 {{ manifest.id[:14] if manifest else '样例预览' }}</span></div></section>
+
+<section class="panel"><div class="sheet-bar"><h2>实际切轨定位</h2><div class="sheet-tools"><span id="decision-segment">切段 {{ result.decision.segment.cut }}（原行 {{ result.decision.segment.cut_line }}）</span></div></div>
+<div class="decision-card" id="decision-card">
+<p id="decision-summary">请求切在目标帧 <b>{{ result.decision.requested_frame }}</b>，反查源坐标 {{ result.decision.segment.source_point }}，落在切段 <b>{{ result.decision.segment.cut }}</b>。{% if result.decision.gap %}请求帧位于目标待证区 [{{ result.decision.gap.gap_from }}, {{ result.decision.gap.gap_to }})，顺延到 {{ result.decision.gap.advance_to }}。{% endif %}</p>
+<p class="defer" id="decision-cues">{% if result.decision.active_cues %}原句未读完，等至其交付末帧再切：{% for cue in result.decision.active_cues %}<span class="cue-ref">原行 {{ cue.line }} · {{ cue.cue_id }} → 帧 {{ cue.deferred_to_frame }}</span>{% endfor %}{% else %}切点未落在任何原句中间，立即切换。{% endif %}</p>
+</div>
+<form id="switch-form" class="switch-form"><label>请求切轨帧<input name="frame" type="number" min="0" value="{{ default_switch.frame }}" required></label>
+<label>原轨<input name="from_track" value="{{ default_switch.from_track }}" required></label>
+<label>译轨<input name="to_track" value="{{ default_switch.to_track }}" required></label>
+<button>重算切轨点</button></form>
+</section>
+
+<section class="panel grid-panel"><div class="sheet-bar"><h2>逐行取舍与原行依据</h2><div class="sheet-tools"><span>{{ result.rows|length }} 行字幕</span>{% if manifest %}<a href="{{ url_for('switching.export',key=manifest.id) }}">下载切轨证据</a>{% endif %}</div></div>
+<div class="sheet-scroll" tabindex="0"><table id="frames"><thead><tr class="letters"><th rowspan="2" class="pinned">#</th>{% for field in columns %}<th scope="col">{{ 'ABCDEFGHI'[loop.index0] }}</th>{% endfor %}</tr>
+<tr>{% for field in columns %}<th scope="col">{{ labels[field] }}</th>{% endfor %}</tr></thead><tbody id="decision-rows">
+{% for row in result.rows %}<tr><th scope="row" class="pinned">{{ loop.index }}</th>{% for field in columns %}
+{% set val = row.get(field) %}<td tabindex="{{ 0 if loop.index == 1 and loop.first else -1 }}" data-cell="{{ 'ABCDEFGHI'[loop.index0] }}{{ loop.index }}" class="{{ 'frame-col' if loop.first else '' }} {{ 'number' if field in ('line','frame_in','frame_out','played_before','played_after') else '' }} status-{{ row.status|lower }}" title="{{ val if val is not none else '' }}">
+{% if val is none %}—{% elif field == 'status' %}<span class="seg {{ row.status|lower }}">{{ {'PLAYED_BEFORE':'切前播完','ABANDONED':'切后弃用','MISSED':'漏播','STRADDLED':'跨点截断','PLAYED_AFTER':'切后播放'}[val] }}</span>{% else %}{{ val }}{% endif %}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div></section>
+
+<section class="panel ledger-panel"><div class="sheet-bar"><h2>覆盖对账（半开整数帧，切轨帧为界）</h2><div class="sheet-tools" id="ledger-balanced">{{ '勾稽平衡' if result.balanced else '勾稽不平' }}</div></div>
+<table class="ledger"><thead><tr><th>轨道</th><th>侧别</th><th>KEEP 并集帧</th><th>切轨前</th><th>切轨后</th><th>差额</th></tr></thead><tbody id="ledger-rows">
+{% for row in result.ledgers %}<tr><td>{{ row.track }}</td><td>{{ '原轨' if row.side == 'from' else '译轨' }}</td><td class="number">{{ row.union_frames }}</td><td class="number">{{ row.before_switch }}</td><td class="number">{{ row.after_switch }}</td><td class="number">{{ row.difference }}</td></tr>{% endfor %}
+</tbody></table>
+<div id="replay-block">{% if result.replays %}<h3 class="replay-title">重播定位（同轨重叠，深度 ≥2 的帧只计一次）</h3>
+<table class="ledger"><thead><tr><th>轨道</th><th>入帧</th><th>出帧</th><th>重播帧</th><th>字幕号</th><th>原行组</th></tr></thead><tbody id="replay-rows">
+{% for row in result.replays %}<tr><td>{{ row.track }}</td><td class="number">{{ row.frame_in }}</td><td class="number">{{ row.frame_out }}</td><td class="number">{{ row.frames }}</td><td>{{ row.cues|join(' / ') }}</td><td>{{ row.lines|join(' / ') }}</td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="empty">切轨后无同轨重叠重播。</p>{% endif %}</div>
+</section>
+</main><footer><span>{{ manifest.version if manifest else 'VENUE-SWITCH / 1' }}</span><span id="notice" role="status">{{ manifest.created_at[:19] ~ ' UTC' if manifest else '请求帧 → 实际切轨帧' }}</span><span>延迟原句 {{ result.counts.delayed }} 条</span></footer></div></div></body></html>

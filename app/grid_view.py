@@ -6,13 +6,17 @@ HEADERS = {
     'balance': ('track', 'original', 'delivered', 'removed', 'pending'),
     'runs': ('id', 'version', 'created_at', 'elapsed_us'),
     'delivery': ('field', 'hash'),
+    'switching': ('line', 'cue_id', 'track', 'frame_in', 'frame_out', 'played_before',
+                  'played_after', 'status', 'text'),
+    'switch_runs': ('id', 'version', 'created_at', 'elapsed_us'),
 }
 LABELS = {'line': '原行', 'cue_id': '字幕号', 'format': '格式', 'in': '原入点', 'out': '原出点', 'code': '原因',
           'text': '字幕文本', 'start': '源入帧', 'end': '源出帧', 'nominal_start': '折算入帧', 'cut': '切段',
           'kind': '分段判定', 'frame_in': '目标入帧', 'frame_out': '目标出帧', 'frames': '重叠帧',
           'track': '轨道', 'cues': '字幕号', 'lines': '原行组', 'original': '原覆盖', 'delivered': '交付覆盖',
           'removed': '剪辑移除', 'pending': '缺段待证', 'id': '归档档号', 'version': '规则版本',
-          'created_at': '生成 UTC', 'elapsed_us': '耗时 μs', 'field': '原件', 'hash': 'SHA-256'}
+          'created_at': '生成 UTC', 'elapsed_us': '耗时 μs', 'field': '原件', 'hash': 'SHA-256',
+          'played_before': '切轨前帧', 'played_after': '切轨后帧', 'status': '取舍'}
 
 
 def cells(stages, sheet, archive, stamp):
